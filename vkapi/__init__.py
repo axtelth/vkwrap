@@ -54,7 +54,6 @@ class Longpoll():
         values = {'group_id': self.group_id} if self.group_id else {}
         response = self.vk.invoke('groups.getLongPollServer' if self.group_id else
                                   'messages.getLongPollServer', values)
-        print(response)
 
         self.key = response['key']
         self.server = response['server']
