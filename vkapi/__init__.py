@@ -1,6 +1,12 @@
 import requests
 
 
+class VkApiError(Exception):
+    def __init__(self, error):
+        self.error = error
+        super().__init__(self.error)
+
+
 class Vk(object):
     __slots__ = ('access_token', 'v')
 
@@ -10,7 +16,10 @@ class Vk(object):
     def invoke(self, method, values={}):
         url = 'https://api.vk.com/method/' + method
         values['access_token'], values['v'] = self.access_token, self.v
-        return requests.get(url, params=values, timeout=5).json()
+        resp = requests.get(url, params=values, timeout=5).json()
+        if 'error' in resp:
+            raise VkApiError(resp)
+        return resp['response']
 
     def get_api(self):
         return VkApiInvoke(self)
@@ -33,21 +42,41 @@ class VkApiInvoke(object):
 
 
 class Longpoll():
-    @staticmethod
-    def listen(vk):
-        data = vk.messages.getLongPollServer()['response']
-        key, ts = data['key'], data['ts']
+    __slots__ = ('vk', 'group_id', 'key', 'server', 'ts', 'url', 'session')
+
+    def __init__(self, vk: Vk, group_id: str = None):
+        self.vk = vk
+        self.group_id = group_id if group_id else None
+        self.session = requests.Session()
+        self.update()
+
+    def update(self) -> None:
+        values = {'group_id': self.group_id} if self.group_id else {}
+        response = self.vk.invoke('groups.getLongPollServer' if self.group_id else
+                                  'messages.getLongPollServer', values)
+        print(response)
+
+        self.key = response['key']
+        self.server = response['server']
+        self.ts = response['ts']
+        self.url = self.server if self.group_id else 'https://' + self.server
+
+    def check(self) -> list:
+        params = {'act': 'a_check', 'key': self.key, 'ts': self.ts, 'wait': 90}
+        response = self.session.get(self.url, params=params).json()
+
+        if 'failed' not in response:
+            self.ts = response['ts']
+            return response['updates']
+        elif response['failed'] == 1:
+            self.ts = response['ts']
+        elif response['failed'] == 2:
+            self.update(ts=False)
+        elif response['failed'] == 3:
+            self.update()
+        return []
+
+    def listen(self):
         while True:
-            params = {'act': 'a_check', 'key': key, 'ts': ts,
-                      'wait': 90, 'mode': 2, 'version': 2}
-            response = requests.get(
-                f'https://{data["server"]}', params=params).json()
-            try:
-                updates = response['updates']
-            except KeyError:
-                data = vk.messages.getLongPollServer()['response']
-                continue
-            ts = response['ts']
-            if updates:
-                for elem in updates:
-                    yield elem
+            for event in self.check():
+                yield event
