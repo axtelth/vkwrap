@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "vkapi"
+name = "vkwrap"
 version = "0.1.0"
 description = "Simple Vk Api Wrapper"
 authors = ["Axtelth <axtelth@gmail.com>"]

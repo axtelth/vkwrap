@@ -32,10 +32,8 @@ class VkApiInvoke(object):
         self._vk, self._method = vk, method
 
     def __getattr__(self, method):
-        return VkApiInvoke(
-            self._vk,
-            (self._method + '.' if self._method else '') + method
-        )
+        return VkApiInvoke(self._vk,
+                           (self._method + '.' if self._method else '') + method)
 
     def __call__(self, **kwargs):
         return self._vk.invoke(self._method, kwargs)
@@ -62,6 +60,8 @@ class Longpoll():
 
     def check(self) -> list:
         params = {'act': 'a_check', 'key': self.key, 'ts': self.ts, 'wait': 90}
+        if not self.group_id:
+            params['mode'], params['version'] = 2, 2
         response = self.session.get(self.url, params=params).json()
 
         if 'failed' not in response:
@@ -69,9 +69,7 @@ class Longpoll():
             return response['updates']
         elif response['failed'] == 1:
             self.ts = response['ts']
-        elif response['failed'] == 2:
-            self.update(ts=False)
-        elif response['failed'] == 3:
+        else:
             self.update()
         return []
 
