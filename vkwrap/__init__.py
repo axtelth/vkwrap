@@ -15,7 +15,7 @@ class Vk(object):
 
     def invoke(self, method, values={}):
         url = 'https://api.vk.com/method/' + method
-        values['access_token'], values['v'] = self.access_token, self.v
+        values |= {'access_token': self.access_token, 'v': self.v}
         resp = requests.get(url, params=values, timeout=5).json()
         if 'error' in resp:
             raise VkApiError(resp)
